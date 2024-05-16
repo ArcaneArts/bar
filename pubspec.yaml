@@ -1,0 +1,17 @@
+name: bar
+description: "Title bars"
+version: 1.0.0
+repository: https://github.com/ArcaneArts/bar
+environment:
+  sdk: '>=3.3.4 <4.0.0'
+  flutter: ">=1.17.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  modern_titlebar_buttons: ^1.1.1
+  universal_io: ^2.2.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+flutter:
