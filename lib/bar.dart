@@ -1,10 +1,14 @@
 library bar;
 
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:modern_titlebar_buttons/modern_titlebar_buttons.dart';
-import 'package:universal_io/io.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:flutter/widgets.dart';
 
-class TitleBar extends StatelessWidget {
+class TitleBar extends StatelessWidget implements PreferredSizeWidget {
   final PlatformTheme? theme;
   final Widget? leading;
   final Widget title;
@@ -16,73 +20,86 @@ class TitleBar extends StatelessWidget {
   final VoidCallback? onStartDragging;
   final VoidCallback? onUnMaximize;
   final Future<bool> Function()? isMaximized;
+  final double barHeight;
 
-  const TitleBar(
-      {super.key,
-      this.leading,
-      required this.title,
-      this.theme,
-      this.color,
-      this.surfaceColor,
-      this.onMinimize,
-      this.onMaximize,
-      this.onStartDragging,
-      this.isMaximized,
-      this.onUnMaximize,
-      this.onClose});
+  const TitleBar({
+    super.key,
+    this.leading,
+    required this.title,
+    this.theme,
+    this.color,
+    this.surfaceColor,
+    this.onMinimize,
+    this.onMaximize,
+    this.onStartDragging,
+    this.isMaximized,
+    this.onUnMaximize,
+    this.onClose,
+    this.barHeight = 32.0,
+  });
+
+  @override
+  Size get preferredSize => Size.fromHeight(barHeight);
 
   @override
   Widget build(BuildContext context) {
     PlatformTheme type = theme ?? _defaultPlatformTheme;
     Color bg = color ?? Colors.black.withOpacity(0.95);
-    Color surface = surfaceColor ?? Colors.white70;
+    Color surface = surfaceColor ?? Colors.white;
 
-    return Directionality(
-        textDirection: TextDirection.ltr,
-        child: GestureDetector(
-          onPanStart: (dsd) => onStartDragging?.call(),
-          child: Container(
-            decoration: BoxDecoration(color: color),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 7, top: 4, bottom: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: switch (type) {
-                  PlatformTheme.windows => [
-                      if (leading != null) leading!,
-                      title,
-                      const Spacer(),
-                      TitleBarButtons(
-                        onMinimize: onMinimize,
-                        onMaximize: onMaximize,
-                        onClose: onClose,
-                        color: surface,
-                        theme: type,
-                      )
-                    ],
-                  PlatformTheme.mac => [
-                      Expanded(
-                          child: TitleBarButtons(
-                        onMinimize: onMinimize,
-                        onMaximize: onMaximize,
-                        onClose: onClose,
-                        color: surface,
-                        theme: type,
-                      )),
-                      if (leading != null) leading!,
-                      title,
-                      const Spacer(),
-                    ]
-                },
-              ),
-            ),
+    return GestureDetector(
+      onPanStart: (details) => onStartDragging?.call(),
+      child: Container(
+        color: bg,
+        height: barHeight,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 7, top: 4, bottom: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: switch (type) {
+              PlatformTheme.windows => [
+                if (leading != null) leading!,
+                title,
+                const Spacer(),
+                TitleBarButtons(
+                  onMinimize: onMinimize ?? () => windowManager.minimize(),
+                  onMaximize: onMaximize ?? () => windowManager.maximize(),
+                  onUnMaximize:
+                  onUnMaximize ?? () => windowManager.unmaximize(),
+                  isMaximized: isMaximized ?? () => windowManager.isMaximized(),
+                  onClose: onClose ?? () => windowManager.close(),
+                  color: surface,
+                  theme: type,
+                ),
+              ],
+              PlatformTheme.mac => [
+                Expanded(
+                  child: TitleBarButtons(
+                    onMinimize: onMinimize ?? () => windowManager.minimize(),
+                    onMaximize: onMaximize ?? () => windowManager.maximize(),
+                    onUnMaximize:
+                    onUnMaximize ?? () => windowManager.unmaximize(),
+                    isMaximized:
+                    isMaximized ?? () => windowManager.isMaximized(),
+                    onClose: onClose ?? () => windowManager.close(),
+                    color: surface,
+                    theme: type,
+                  ),
+                ),
+                if (leading != null) leading!,
+                title,
+                const Spacer(),
+              ],
+            },
           ),
-        ));
+        ),
+      ),
+    );
   }
 }
 
-class TitleBarButtons extends StatelessWidget {
+class TitleBarButtons extends StatefulWidget {
   final Color color;
   final PlatformTheme? theme;
   final VoidCallback? onMinimize;
@@ -91,52 +108,95 @@ class TitleBarButtons extends StatelessWidget {
   final VoidCallback? onUnMaximize;
   final Future<bool> Function()? isMaximized;
 
-  const TitleBarButtons(
-      {super.key,
-      this.theme,
-      required this.color,
-      this.onMinimize,
-      this.onMaximize,
-      this.onClose,
-      this.onUnMaximize,
-      this.isMaximized});
+  const TitleBarButtons({
+    super.key,
+    this.theme,
+    required this.color,
+    this.onMinimize,
+    this.onMaximize,
+    this.onClose,
+    this.onUnMaximize,
+    this.isMaximized,
+  });
+
+  @override
+  State<TitleBarButtons> createState() => _TitleBarButtonsState();
+}
+
+class _TitleBarButtonsState extends State<TitleBarButtons> {
+  bool _isCurrentlyMaximized = false;
 
   @override
   Widget build(BuildContext context) {
-    PlatformTheme type = theme ?? _defaultPlatformTheme;
+    PlatformTheme type = widget.theme ?? _defaultPlatformTheme;
 
-    List<Widget> w = [
+    Future<void> _handleMaximizeToggle() async {
+      if (widget.isMaximized != null) {
+        final isMax = await widget.isMaximized!();
+        setState(() {
+          _isCurrentlyMaximized = isMax;
+        });
+
+        if (isMax) {
+          widget.onUnMaximize?.call();
+        } else {
+          widget.onMaximize?.call();
+        }
+      } else {
+        // If isMaximized callback isn't provided, toggle based on internal state
+        setState(() {
+          _isCurrentlyMaximized = !_isCurrentlyMaximized;
+        });
+
+        if (_isCurrentlyMaximized) {
+          widget.onMaximize?.call();
+        } else {
+          widget.onUnMaximize?.call();
+        }
+      }
+    }
+
+    List<Widget> buttons = [
       DecoratedMinimizeButton(
-          type: type.toThemeType(), onPressed: () => onMinimize?.call()),
+        type: type.toThemeType(),
+        onPressed: widget.onMinimize,
+      ),
       DecoratedMaximizeButton(
-          type: type.toThemeType(),
-          onPressed: () => (isMaximized?.call() ?? Future.value(false)).then(
-              (value) => value ? onUnMaximize?.call() : onMaximize?.call())),
+        type: type.toThemeType(),
+        onPressed: _handleMaximizeToggle,
+      ),
       DecoratedCloseButton(
-          type: type.toThemeType(), onPressed: () => onClose?.call()),
+        type: type.toThemeType(),
+        onPressed: () {
+          if (widget.onClose != null) {
+            widget.onClose!();
+          }
+        },
+      ),
     ];
 
-    Widget r = Row(
+    Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: switch (type) {
-        PlatformTheme.windows => [w[0], w[1], w[2]],
-        PlatformTheme.mac => [w[2], w[0], w[1]],
+        PlatformTheme.windows => buttons,
+        PlatformTheme.mac => [buttons[2], buttons[0], buttons[1]],
       },
     );
 
     return type.isColorFiltered
         ? ColorFiltered(
-            colorFilter: ColorFilter.mode(color, BlendMode.srcATop),
-            child: r,
-          )
-        : r;
+      colorFilter: ColorFilter.mode(widget.color, BlendMode.srcATop),
+      child: row,
+    )
+        : row;
   }
 }
 
-PlatformTheme get _defaultPlatformTheme => Platform.isWindows
-    ? PlatformTheme.windows
-    : Platform.isMacOS
+PlatformTheme get _defaultPlatformTheme =>
+    kIsWeb ? PlatformTheme.windows :Platform.isWindows
+        ? PlatformTheme.windows
+        : Platform.isMacOS
         ? PlatformTheme.mac
         : PlatformTheme.windows;
 
@@ -150,8 +210,6 @@ extension XPlatformTheme on PlatformTheme {
       case PlatformTheme.mac:
         return ThemeType.osxArc;
     }
-
-    return ThemeType.adwaita;
   }
 
   bool get isColorFiltered => this == PlatformTheme.windows;
