@@ -3,10 +3,8 @@ library bar;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:modern_titlebar_buttons/modern_titlebar_buttons.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:flutter/widgets.dart';
+import 'package:modern_titlebar_buttons/modern_titlebar_buttons.dart';
 
 class TitleBar extends StatelessWidget implements PreferredSizeWidget {
   final PlatformTheme? theme;
@@ -44,8 +42,8 @@ class TitleBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     PlatformTheme type = theme ?? _defaultPlatformTheme;
-    Color bg = color ?? Colors.black.withOpacity(0.95);
-    Color surface = surfaceColor ?? Colors.white;
+    Color bg = color ?? Color(0xFF000000).withOpacity(0.95);
+    Color surface = surfaceColor ?? Color(0xFFFFFFFF);
 
     return GestureDetector(
       onPanStart: (details) => onStartDragging?.call(),
@@ -63,12 +61,11 @@ class TitleBar extends StatelessWidget implements PreferredSizeWidget {
                 title,
                 const Spacer(),
                 TitleBarButtons(
-                  onMinimize: onMinimize ?? () => windowManager.minimize(),
-                  onMaximize: onMaximize ?? () => windowManager.maximize(),
-                  onUnMaximize:
-                  onUnMaximize ?? () => windowManager.unmaximize(),
-                  isMaximized: isMaximized ?? () => windowManager.isMaximized(),
-                  onClose: onClose ?? () => windowManager.close(),
+                  onMinimize: onMinimize,
+                  onMaximize: onMaximize,
+                  onUnMaximize: onUnMaximize,
+                  isMaximized: isMaximized,
+                  onClose: onClose,
                   color: surface,
                   theme: type,
                 ),
@@ -76,13 +73,11 @@ class TitleBar extends StatelessWidget implements PreferredSizeWidget {
               PlatformTheme.mac => [
                 Expanded(
                   child: TitleBarButtons(
-                    onMinimize: onMinimize ?? () => windowManager.minimize(),
-                    onMaximize: onMaximize ?? () => windowManager.maximize(),
-                    onUnMaximize:
-                    onUnMaximize ?? () => windowManager.unmaximize(),
-                    isMaximized:
-                    isMaximized ?? () => windowManager.isMaximized(),
-                    onClose: onClose ?? () => windowManager.close(),
+                    onMinimize: onMinimize,
+                    onMaximize: onMaximize,
+                    onUnMaximize: onUnMaximize,
+                    isMaximized: isMaximized,
+                    onClose: onClose,
                     color: surface,
                     theme: type,
                   ),
@@ -186,15 +181,17 @@ class _TitleBarButtonsState extends State<TitleBarButtons> {
 
     return type.isColorFiltered
         ? ColorFiltered(
-      colorFilter: ColorFilter.mode(widget.color, BlendMode.srcATop),
-      child: row,
-    )
+          colorFilter: ColorFilter.mode(widget.color, BlendMode.srcATop),
+          child: row,
+        )
         : row;
   }
 }
 
 PlatformTheme get _defaultPlatformTheme =>
-    kIsWeb ? PlatformTheme.windows :Platform.isWindows
+    kIsWeb
+        ? PlatformTheme.windows
+        : Platform.isWindows
         ? PlatformTheme.windows
         : Platform.isMacOS
         ? PlatformTheme.mac
